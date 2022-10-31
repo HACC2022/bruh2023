@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+  	// Matches all subcollections of /users/
+  	match /users/{document=**} {
+  	    // Private; `get` prevents querying against entire collection.
+  	    allow get: if request.auth != null
+
+        // Only allow creating documents linked to the user's UID.
+        allow create: if request.resource.id == request.auth.uid || request.path[4] == request.auth.uid
+    }
+
+    // Allow users to list, update, and delete documents that they own.
+    match /users/{userId}/userLinks/{link=**} {
+        allow list, update, delete: if request.auth.uid == userId
+    }
+
+    match /links/{link} {
+        // Public; `get` prevents querying against entire collection.
+        allow get
+
+        // Allow modifications only if user owns the link.
+        allow create, update: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/userLinks/$(request.resource.id))
+        allow delete: if exists(/databases/$(database)/documents/users/$(request.auth.uid)/userLinks/$(link))
+    }
+  }
+}
